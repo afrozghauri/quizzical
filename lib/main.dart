@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/services.dart';
-import 'package:frontend_quizzical/config/app_config.dart';
-import 'firebase_options.dart';
+
+import 'package:frontend_quizzical/firebase_options.dart';
 import 'package:frontend_quizzical/routes/app_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uni_links/uni_links.dart';
 import 'package:frontend_quizzical/screens/quiz_taking_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,33 +13,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Future to handle initial link and set initial route
-  Future<String?> handleInitialLink() async {
-    try {
-      final initialLink = await getInitialLink();
-      if (initialLink != null) {
-        final uri = Uri.parse(initialLink); // Parse the initialLink into a Uri
-        handleIncomingLink(uri); // Pass the Uri to handleIncomingLink
-        return uri.pathSegments.last; // Extract permalink or return null
-      } else {
-        return null;
-      }
-    } on PlatformException {
-      // Handle platform-specific errors
-      print('Error getting initial link');
-      return null;
-    }
-  }
-
-  linkStream.listen((String? link) {
-    if (link != null) {
-      handleIncomingLink(Uri.parse(link)); // Parse link into Uri before passing
-    }
-  }, onError: (err) {
-    print('Error handling incoming link: $err');
-  });
-
-  // Use FutureBuilder to wait for initialLink handling
+  // Use FutureBuilder to wait for initial link handling
   runApp(
     ProviderScope(
       child: FutureBuilder<String?>(
@@ -48,12 +21,16 @@ void main() async {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const MaterialApp(
-                home:
-                    Scaffold(body: Center(child: CircularProgressIndicator())));
+              home: Scaffold(body: Center(child: CircularProgressIndicator())),
+            );
           } else if (snapshot.hasError) {
             return MaterialApp(
-                home: Scaffold(
-                    body: Center(child: Text('Error: ${snapshot.error}'))));
+              home: Scaffold(
+                body: Center(
+                  child: Text('Error: ${snapshot.error}'),
+                ),
+              ),
+            );
           } else {
             final initialPermalink = snapshot.data;
             return MyApp(initialPermalink: initialPermalink);
@@ -68,12 +45,31 @@ void main() async {
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // Function to handle incoming links (both initial and while app is running)
-void handleIncomingLink(Uri uri) {
-  // Change parameter type to Uri
+Future<String?> handleInitialLink() async {
+  // Get the initial link using your platform-specific method (e.g., deep_links package)
+  final Uri? uri = await getInitialLink();
 
+  if (uri != null) {
+    handleIncomingLink(uri);
+    return uri.pathSegments.last;
+  } else {
+    return null;
+  }
+}
+
+// Function to retrieve the initial link (platform-specific implementation needed)
+Future<Uri?> getInitialLink() async {
+  // Replace this with your platform-specific logic to get the initial link
+  // (e.g., using deep_links package or similar)
+  print('** Implement platform-specific logic to get initial link here **');
+  return null; // Placeholder until you implement the logic
+}
+
+// Function to handle incoming links (both initial and while app is running)
+void handleIncomingLink(Uri uri) {
   // Check if the scheme and host match your app configuration
-  if (uri.scheme == 'quizzical' &&
-      uri.host == AppConfig.baseUrl.replaceFirst('http://', '')) {
+  if (uri.scheme == 'https' && uri.host == 'your_app_domain') {
+    // Update with your actual app domain
     final pathSegments = uri.pathSegments;
 
     // Check for the /quizzes/<quiz_id> format
@@ -90,6 +86,9 @@ void handleIncomingLink(Uri uri) {
       // Handle other deep link paths or invalid links
       print('Invalid deep link path: ${uri.path}');
     }
+  } else {
+    // Handle external links (not from your app domain)
+    launch(uri.toString());
   }
 }
 
